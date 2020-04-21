@@ -1,9 +1,9 @@
 (ns ^:figwheel-hooks quaxt.arithmetic-challenge
-  (:require [reagent.core :as r]
-            [reagent.dom :as rdom]
-            [clojure.string :as str]))
+  (:require
+   [goog.dom :as gdom]
+   [reagent.core :as r]))
 
-(println "Hello world!")
+(println "This text is printed from src/quaxt/arithmetic_challenge.cljs. Go ahead and edit it and see reloading in action.")
 
 (defonce timer (r/atom (js/Date.)))
 
@@ -16,13 +16,7 @@
 (defn ask [op x y font-size]
   [:div
    {:style {:font-size (str font-size "vh")}}
-   x op op y])
-
-(defn clock []
-  (let [time-str (-> @timer .toTimeString (str/split " ") first)]
-    [:div.example-clock
-     {:style {:color @time-color}}
-     time-str]))
+   x op y])
 
 (defn color-input []
   [:div.color-input
@@ -42,4 +36,24 @@
    [adjust-size-button 1 "bigger"]
    [adjust-size-button -1 "smaller"]])
 
-(rdom/render [simple-example] (js/document.getElementById "app"))
+(defn mount [el]
+  (r/render-component [simple-example] el))
+
+(defn get-app-element []
+  (gdom/getElement "app"))
+
+(defn mount-app-element []
+  (when-let [el (get-app-element)]
+    (mount el)))
+
+;; conditionally start your application based on the presence of an "app" element
+;; this is particularly helpful for testing this ns without launching the app
+(mount-app-element)
+
+;; specify reload hook with ^;after-load metadata
+(defn ^:after-load on-reload []
+  (mount-app-element)
+  ;; optionally touch your app-state to force rerendering depending on
+  ;; your application
+  ;; (swap! app-state update-in [:__figwheel_counter] inc)
+)
