@@ -3,38 +3,62 @@
    [goog.dom :as gdom]
    [reagent.core :as r]))
 
-(println "This text is printed from src/quaxt/arithmetic_challenge.cljs. Go ahead and edit it and see reloading in action.")
+(defonce app-state (r/atom {:user-answer ""}))
 
-(defonce timer (r/atom (js/Date.)))
-
-(defonce font-size (r/atom 12))
-
-(defonce time-color (r/atom "#f34"))
-
-(defonce time-updater (js/setInterval #(reset! timer (js/Date.)) 1000))
-
-(defn ask [op x y font-size]
+(defn ask [op x y user-answer]
   [:div
-   {:style {:font-size (str font-size "vh")}}
-   x op y])
+   {:style {:font-size "20vh"}}
+   x op y "=" user-answer "\u25AE"])
 
-(defn color-input []
-  [:div.color-input
-   "Time color: "
-   [:input {:type "text"
-            :value @time-color
-            :on-change #(reset! time-color (-> % .-target .-value))}]])
+(defn type-key[text]
+  (swap! app-state update :user-answer str text))
 
-(defn adjust-size-button [delta text]
+(defn keypad-key[text map]
   [:button
-   {:on-click #(swap! font-size + delta)}
+   (assoc (update map :style merge {:font-size "10vh"
+                                    :width "100%"})
+          :on-click #(type-key text))
    text])
+
+(defn type-backspace[]
+  (swap! app-state
+         update
+         :user-answer
+         (fn[string]
+           (subs string 0 (- (count string) 1)))))
+
+(defn backspace-key[]
+  [:button {:style {:font-size "10vh" :width "100%"}
+            :on-click type-backspace}
+   "\u232B"])
+
+(defn type-enter[]
+  (swap! app-state
+         update
+         :user-answer
+         (fn[string]
+           (subs string 0 (- (count string) 1)))))
+
+(defn enter-key[]
+  [:button {:style {:font-size "10vh" :width "100%"}
+  #=          :on-click type-enter}
+   "\u23CE"])
+
+(defn keypad[]
+  [:table
+   {:style {:width"100vw"}}
+   [:tbody
+    [:tr [:td [keypad-key "7"]][:td [keypad-key "8"]][:td [keypad-key "9"]]]
+    [:tr [:td [keypad-key "4"]][:td [keypad-key "5"]][:td [keypad-key "6"]]]
+    [:tr [:td [keypad-key "1"]][:td [keypad-key "2"]][:td [keypad-key "3"]]]
+    [:tr [:td [keypad-key "0"]]
+     [:td [backspace-key]]
+     [:td [enter-key]]]]])
 
 (defn simple-example []
   [:div
-   [ask "*" 12 12 @font-size]
-   [adjust-size-button 1 "bigger"]
-   [adjust-size-button -1 "smaller"]])
+   [ask "*" 12 12 (:user-answer @app-state)]
+   [keypad]])
 
 (defn mount [el]
   (r/render-component [simple-example] el))
@@ -46,14 +70,21 @@
   (when-let [el (get-app-element)]
     (mount el)))
 
-;; conditionally start your application based on the presence of an "app" element
-;; this is particularly helpful for testing this ns without launching the app
-(mount-app-element)
+(defn key-listener[key-event]
+  (let[key (.-key key-event)]
+    (cond
+      (#{"0" "1" "2" "3" "4" "5" "6" "7" "8" "9"} key) (type-key key)
+      (= key "Backspace") (type-backspace)
+      (= key "Enter") (type-enter))))
 
-;; specify reload hook with ^;after-load metadata
+(defn add-key-listener []
+  (println "akl")
+  (.addEventListener (gdom/getDocument) "keydown" key-listener))
+
+(mount-app-element)
+(defonce setup-stuff
+  (do (add-key-listener)
+      true))
+
 (defn ^:after-load on-reload []
-  (mount-app-element)
-  ;; optionally touch your app-state to force rerendering depending on
-  ;; your application
-  ;; (swap! app-state update-in [:__figwheel_counter] inc)
-)
+  (mount-app-element))
