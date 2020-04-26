@@ -49,12 +49,23 @@
 (defn type-key[text]
   (swap! app-state update :user-answer str text))
 
-(defn keypad-key[text map]
-  [:button
-   (assoc (update map :style merge {:font-size "10vh"
-                                    :width "100%"})
-          :on-click #(type-key text))
-   text])
+(defn key-div[text on-click]
+  [:div
+   {:style {:font-size "10vh"
+            :width "100%"
+            :background "#f1f3f4"
+            :color "#202124"
+            :border "1px solid #f1f3f4"
+            :border-radius "4px"
+            :cursor "pointer"
+            :font-family "arial,sans-serif"
+            :text-align "center"                                  
+            }
+    :on-click on-click}
+    text])
+
+(defn keypad-key[text]
+  [key-div text #(type-key text)])
 
 (defn type-backspace[]
   (swap! app-state
@@ -64,9 +75,7 @@
            (subs string 0 (- (count string) 1)))))
 
 (defn backspace-key[]
-  [:button {:style {:font-size "10vh" :width "100%"}
-            :on-click type-backspace}
-   "\u232B"])
+  [key-div "\u232B" type-backspace])
 
 (defn as-int
   [x]
@@ -119,29 +128,28 @@
 (defn type-enter[]
   (let [{:keys [user-answer quiz results start-time]} @app-state]
     (if (first quiz)
-      (let [results (conj results 
-                          {:question (first quiz)
-                           :time (- (now) start-time)
-                           :user-answer (as-int user-answer)})]
-        (update-difficulty-table results)
-        (swap! app-state
-               assoc
-               :user-answer ""
-               :quiz (rest quiz)
-               :results results
-               :start-time (now)))
+      (when-not (= user-answer "")
+        (let [results (conj results 
+                            {:question (first quiz)
+                             :time (- (now) start-time)
+                             :user-answer (as-int user-answer)})]
+          (update-difficulty-table results)
+          (swap! app-state
+                 assoc
+                 :user-answer ""
+                 :quiz (rest quiz)
+                 :results results
+                 :start-time (now))))
       (do
         (set-local-storage "difficulty" (:difficulty @app-state))
         (start-new-quiz quiz-length)))))
 
 (defn enter-key[font-size]
-  [:button {:style {:font-size (or font-size "10vh") :width "100%"}
-  #=          :on-click type-enter}
-   "\u23CE"])
+  [key-div "\u23CE" type-enter])
 
 (defn keypad[]
   [:table
-   {:style {:width"100vw"}}
+   {:style {:width "100%" :table-layout " fixed"}}
    [:tbody
     [:tr [:td [keypad-key "7"]][:td [keypad-key "8"]][:td [keypad-key "9"]]]
     [:tr [:td [keypad-key "4"]][:td [keypad-key "5"]][:td [keypad-key "6"]]]
