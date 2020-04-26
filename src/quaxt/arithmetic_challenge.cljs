@@ -176,7 +176,7 @@
   (let [{:keys [user-answer quiz]} @app-state
         question (first quiz)]
     (if question
-      [:div
+      [:div {:style {:touch-action "manipulation"}}
        [ask question user-answer]
        [keypad]]
       [results-div])))
