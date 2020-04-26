@@ -5,6 +5,8 @@
    [reagent.core :as r]
    [clojure.edn :as edn]))
 
+(set! *warn-on-infer* true)
+
 (defonce app-state (r/atom {}))
 
 (defonce quiz-length 10)
@@ -185,13 +187,16 @@
   (r/render-component [quiz-app] el))
 
 (defn get-app-element []
-  (gdom/getElement "app"))
+  (.getElementById ^js/Document (gdom/getDocument) "app"))
 
 (defn mount-app-element []
-  (when-let [el (get-app-element)]
-    (mount el)))
+  (println "start")
+  (let [el (get-app-element)]
+    (println el)
+    (mount el)
+    (println "done")))
 
-(defn key-listener[key-event]
+(defn key-listener[^js/KeyboardEvent key-event]
   (let [key (.-key key-event)]
     (cond
       (#{"0" "1" "2" "3" "4" "5" "6" "7" "8" "9"} key) (type-key key)
@@ -200,14 +205,21 @@
 
 (defn add-key-listener []
   (println "akl")
-  (.addEventListener (gdom/getDocument) "keydown" key-listener))
+    (.addEventListener ^js/Document (gdom/getDocument) "keydown" key-listener))
 
-(mount-app-element)
+(defn load-listener[x]
+  (mount-app-element)
+  (println "loaded"))
+
+(defn add-load-listerner[]
+  (println "onload")
+  (.addEventListener js/window "load" load-listener))
 
 (defonce setup-stuff
   (do
     (read-difficulty-table-from-local-storage)
-    (add-key-listener)  
+    (add-key-listener)
+    (add-load-listerner)
     (start-new-quiz quiz-length)
     true))
 
