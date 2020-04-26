@@ -1,7 +1,6 @@
 (ns ^:figwheel-hooks quaxt.arithmetic-challenge
   (:require
    [clojure.string :as str]
-   [goog.dom :as gdom]
    [reagent.core :as r]
    [clojure.edn :as edn]))
 
@@ -193,11 +192,10 @@
   (r/render-component [quiz-app] el))
 
 (defn get-app-element []
-  (.getElementById ^js/Document (gdom/getDocument) "app"))
+  (.getElementById js/document "app"))
 
 (defn mount-app-element []
-  (let [el (get-app-element)]
-    (mount el)))
+  (mount (get-app-element)))
 
 (defn key-listener[^js/KeyboardEvent key-event]
   (let [key (.-key key-event)]
@@ -207,7 +205,7 @@
       (= key "Enter") (type-enter))))
 
 (defn add-key-listener []
-  (.addEventListener ^js/Document (gdom/getDocument) "keydown" key-listener))
+  (.addEventListener js/document "keydown" key-listener))
 
 (defn load-listener[x]
   (mount-app-element))
