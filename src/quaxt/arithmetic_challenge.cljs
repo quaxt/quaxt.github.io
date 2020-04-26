@@ -5,8 +5,6 @@
    [reagent.core :as r]
    [clojure.edn :as edn]))
 
-(set! *warn-on-infer* true)
-
 (defonce app-state (r/atom {}))
 
 (defonce quiz-length 10)
@@ -45,7 +43,7 @@
 
 (defn ask [{:keys [x op y]} user-answer]
   [:div
-   {:style {:font-size "20vh"}}
+   {:style {:font-size "17vw"}}
    x op y "=" user-answer "\u25AE"])
 
 (defn type-key[text]
@@ -116,9 +114,7 @@
 
 (defn update-difficulty-table[results]
   (let [difficulty-table (compute-difficulty-table results)]
-    (println difficulty-table)
-    (swap! app-state assoc :difficulty difficulty-table)
-    (set-local-storage "difficulty" difficulty-table)))
+    (swap! app-state assoc :difficulty difficulty-table)))
 
 (defn type-enter[]
   (let [{:keys [user-answer quiz results start-time]} @app-state]
@@ -134,7 +130,9 @@
                :quiz (rest quiz)
                :results results
                :start-time (now)))
-      (start-new-quiz quiz-length))))
+      (do
+        (set-local-storage "difficulty" (:difficulty @app-state))
+        (start-new-quiz quiz-length)))))
 
 (defn enter-key[font-size]
   [:button {:style {:font-size (or font-size "10vh") :width "100%"}
@@ -160,7 +158,7 @@
 
 (defn results-div[]
   (let [results (:results @app-state)
-        style {:style {:font-size "7vh"}}]
+        style {:style {:font-size "5vh"}}]
     [:table
      [:tbody      
       (map-indexed
@@ -190,11 +188,8 @@
   (.getElementById ^js/Document (gdom/getDocument) "app"))
 
 (defn mount-app-element []
-  (println "start")
   (let [el (get-app-element)]
-    (println el)
-    (mount el)
-    (println "done")))
+    (mount el)))
 
 (defn key-listener[^js/KeyboardEvent key-event]
   (let [key (.-key key-event)]
@@ -204,15 +199,12 @@
       (= key "Enter") (type-enter))))
 
 (defn add-key-listener []
-  (println "akl")
-    (.addEventListener ^js/Document (gdom/getDocument) "keydown" key-listener))
+  (.addEventListener ^js/Document (gdom/getDocument) "keydown" key-listener))
 
 (defn load-listener[x]
-  (mount-app-element)
-  (println "loaded"))
+  (mount-app-element))
 
 (defn add-load-listerner[]
-  (println "onload")
   (.addEventListener js/window "load" load-listener))
 
 (defonce setup-stuff
