@@ -49,7 +49,7 @@
 
 (defn ask [question user-answer]
   [:div
-   {:style {:font-size "15vw"}}
+   {:style {:font-size "14vw"}}
    (question-to-string question user-answer) "\u25AE"])
 
 (defn type-key[text]
