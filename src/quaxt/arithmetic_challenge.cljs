@@ -49,8 +49,8 @@
 
 (defn ask [question user-answer]
   [:div
-   {:style {:font-size "14vw"}}
-   (question-to-string question user-answer) "\u25AE"])
+   {:style {:font-size "13vw"}}
+   (question-to-string question user-answer) "_"])
 
 (defn type-key[text]
   (swap! app-state update :user-answer str text))
