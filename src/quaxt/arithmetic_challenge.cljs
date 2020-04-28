@@ -49,7 +49,7 @@
 
 (defn ask [question user-answer]
   [:div
-   {:style {:font-size "17vw"}}
+   {:style {:font-size "15vw"}}
    (question-to-string question user-answer) "\u25AE"])
 
 (defn type-key[text]
@@ -206,7 +206,7 @@
                            (case d
                              1000000 "#ffffff"
                              2000000 "#ff0000"
-                             (let [level (* 0.0128 d)]
+                             (let [level (* 0.0512 d)]
                                (str "rgb(" level ","
                                     level ","
                                     level ")")))
