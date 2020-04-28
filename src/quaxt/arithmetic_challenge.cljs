@@ -12,13 +12,13 @@
   []
   (shuffle (concat
             (for [op ["+" "*"]
-                  x (range 0 13)
-                  y (range 0 13)]
+                  x (range 1 13)
+                  y (range 1 13)]
               {:op op :x x :y y})
-            (for [x (range 0 13)
-                  y (range 0 x)]
+            (for [y (range 1 13)
+                  x (range y (+ y 12))]
               {:op "-" :x x :y y})
-            (for [x (range 0 13)
+            (for [x (range 1 13)
                   y (range 1 13)]
               {:op "/" :x (* x y) :y y}))))
 
@@ -40,28 +40,40 @@
          :user-answer ""
          :start-time (now)))
 
-(defn ask [{:keys [x op y]} user-answer]
+(defn question-to-string[{:keys [op x y]} user-answer]
+  (let [op ({"*" "\u00D7"
+             "/" "\u00F7"
+             "+" "+"
+             "-" "-"} op)]
+    (str x " " op " " y " = " user-answer)))
+
+(defn ask [question user-answer]
   [:div
    {:style {:font-size "17vw"}}
-   x op y "=" user-answer "\u25AE"])
+   (question-to-string question user-answer) "\u25AE"])
 
 (defn type-key[text]
   (swap! app-state update :user-answer str text))
 
 (defn key-div[text on-click]
   [:div
-   {:style {:font-size "10vh"
-            :width "100%"
-            :background "#f1f3f4"
-            :color "#202124"
-            :border "1px solid #f1f3f4"
-            :border-radius "4px"
-            :cursor "pointer"
-            :font-family "arial,sans-serif"
-            :text-align "center"                                  
-            }
-    :on-click on-click}
-    text])
+   {:style {:height "10vh"}
+    }
+   
+   [:button
+    {:style {:height "9vh"
+             :font-size "8vh"
+             :width "100%"
+             :background "#f1f3f4"
+             :color "#202124"
+             :border "1px solid #f1f3f4"
+             :border-radius "4px"
+             :cursor "pointer"
+             :font-family "arial,sans-serif"
+             :text-align "center"                                  
+             }
+     :on-click on-click}
+    text]])
 
 (defn keypad-key[text]
   [key-div text #(type-key text)])
@@ -96,14 +108,13 @@
    "*" *
    "/" /})
 
-(defn right? [op x y user-answer]
+(defn right? [{:keys [op x y]} user-answer]
   (= ((lookup-op op) x y) user-answer))
 
 (defn difficulty[{:keys [question time user-answer]}]
-  (let [{:keys [op x y]} question]
-    (if (right? op x y user-answer)
-      time
-      2000000)))
+  (if (right? question user-answer)
+    time
+    2000000))
 
 (defn read-difficulty-table-from-local-storage[]
   (let [difficulty-table-string (get-local-storage "difficulty")
@@ -157,14 +168,18 @@
      [:td [backspace-key]]
      [:td [enter-key]]]]])
 
-(defn right-or-wrong-td[style op x y user-answer]
-  (let [right (right? op x y user-answer)]
+(defn right-or-wrong-td[style question user-answer]
+  (let [right (right? question user-answer)]
     (let [s (assoc-in style [:style :color] (if right "#00aa00" "ff0000"))]
       [:td s
        (if right "\u2713" "\u2717")])))
 
 (defn results-div[]
   (let [results (:results @app-state)
+        results (sort
+                 (fn[x y] (compare 
+                           [(not (right? (:question y) (:user-answer y))) (:time y)]
+                           [(not (right? (:question x) (:user-answer x))) (:time x)])) results)
         style {:style {:font-size "5vh"}}]
     [:table
      [:tbody      
@@ -172,21 +187,61 @@
        (fn[index
            {:keys [time user-answer]
             {:keys [op x y]} :question}]
-         ^{:key index} [:tr [:td style x op  y]
-                            [:td style "="]
-                            [:td style user-answer]
-                        (right-or-wrong-td style op x y user-answer)
-                        [:td style (str (/ time 1000) " s")]]) results)
+         (let [question {:op op :x x :y y}] ^{:key
+                                              index}
+           [:tr [:td (assoc-in
+                      style [:style :align] "center") (question-to-string question
+                                                                 user-answer)]
+            
+            (right-or-wrong-td style question user-answer)
+            [:td (assoc-in style [:style :align] "right") (str  time " ms")]])) results)
+      
       [:tr [:td {:col-span "4"} [enter-key "7vh"]]]]]))
+
+
+(defn progress[]
+  (let [difficulty (:difficulty @app-state)
+        question-color (fn[question]
+                         (let [d (difficulty question 1000000)]
+                           (case d
+                             1000000 "#ffffff"
+                             2000000 "#ff0000"
+                             (let [level (* 0.0128 d)]
+                               (str "rgb(" level ","
+                                    level ","
+                                    level ")")))
+                           ))]
+    [:svg {:view-box "0 0 48 12"
+           :width "100%"
+           :height "120"
+           :preserve-aspect-ratio "none"
+           :xmlns "http://www.w3.org/2000/svg"}
+     (for [i (range 0 48)
+           j (range 0 12)
+           :let [op-index (quot i 12)
+                 op (["+" "*" "-" "/"] op-index)
+                 [x y] [(inc (mod i 12)) (inc j)]
+                 [x y] (case op
+                         "+" [x y]
+                         "*" [x y]
+                         "-" [(+ x y) y]
+                         "/" [(* x y) y])]]
+       ^{:key (str/join " " [i j])}
+       [:rect {:x i :y j :width "1" :height "1"
+               :fill (question-color {:op op :x x :y y})}])]))
 
 (defn quiz-app []
   (let [{:keys [user-answer quiz]} @app-state
         question (first quiz)]
-    (if question
-      [:div {:style {:touch-action "manipulation"}}
-       [ask question user-answer]
-       [keypad]]
-      [results-div])))
+    [:div {:style {:width "100%"}}
+     [:div
+      (if question
+        [:div {:style {:touch-action "manipulation"}}
+         [ask question user-answer]
+         [keypad]]
+        [results-div])]
+     [progress]
+     ]))
 
 (defn mount [el]
   (r/render-component [quiz-app] el))
@@ -223,3 +278,6 @@
 
 (defn ^:after-load on-reload []
   (mount-app-element))
+
+
+
