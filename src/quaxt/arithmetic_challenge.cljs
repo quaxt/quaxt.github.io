@@ -16,7 +16,7 @@
                   y (range 1 13)]
               {:op op :x x :y y})
             (for [y (range 1 13)
-                  x (range y (+ y 12))]
+                  x (range y (+ y 13))]
               {:op "-" :x x :y y})
             (for [x (range 1 13)
                   y (range 1 13)]
@@ -209,8 +209,7 @@
                              (let [level (* 0.0512 d)]
                                (str "rgb(" level ","
                                     level ","
-                                    level ")")))
-                           ))]
+                                    level ")")))))]
     [:svg {:view-box "0 0 48 12"
            :width "100%"
            :height "120"
@@ -225,10 +224,12 @@
                          "+" [x y]
                          "*" [x y]
                          "-" [(+ x y) y]
-                         "/" [(* x y) y])]]
+                         "/" [(* x y) y])
+                 question {:op op :x x :y y}]]
        ^{:key (str/join " " [i j])}
        [:rect {:x i :y j :width "1" :height "1"
-               :fill (question-color {:op op :x x :y y})}])]))
+               :fill (question-color question)
+               :on-click #(print (question-to-string question ""))}])]))
 
 (defn quiz-app []
   (let [{:keys [user-answer quiz]} @app-state
