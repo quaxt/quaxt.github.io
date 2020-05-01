@@ -128,8 +128,7 @@
                                    (difficulty result)
                                    [(:question result)
                                     (difficulty result)]) results))]
-    (merge old-results result-map))
-  )
+    (merge old-results result-map)))
 
 (defn update-difficulty-table[results]
   (let [difficulty-table (compute-difficulty-table results)]
@@ -174,13 +173,24 @@
       [:td s
        (if right "\u2713" "\u2717")])))
 
+(defn results-total
+  "take results and return number of right answers and total time"
+  [results]
+  (->> results
+       (map
+        (fn[{:keys [question user-answer time]}]
+          [(if (right? question user-answer) 1 0)
+           time]))
+       (apply map +)))
+
 (defn results-div[]
   (let [results (:results @app-state)
         results (sort
                  (fn[x y] (compare 
                            [(not (right? (:question y) (:user-answer y))) (:time y)]
                            [(not (right? (:question x) (:user-answer x))) (:time x)])) results)
-        style {:style {:font-size "5vh"}}]
+        [right-count total-time] (results-total results)
+        style {:style {:font-size "4vh"}}]
     [:table
      [:tbody      
       (map-indexed
@@ -190,14 +200,23 @@
          (let [question {:op op :x x :y y}] ^{:key
                                               index}
            [:tr [:td (assoc-in
-                      style [:style :align] "center") (question-to-string question
+                      style [:style :text-align] "center") (question-to-string question
                                                                  user-answer)]
             
             (right-or-wrong-td style question user-answer)
-            [:td (assoc-in style [:style :align] "right") (str  time " ms")]])) results)
-      
+            [:td (assoc-in style [:style :text-align] "right") (str  time " ms")]])) results)
+      [:tr [:td
+            (-> style
+                (assoc-in [:style :text-align] "center")
+                (assoc-in [:style :border-top] "black 1px solid")
+                (assoc-in [:col-span] "2"))
+            right-count " / 10"]
+       [:td (-> style
+                (assoc-in [:style :text-align] "right")
+                (assoc-in [:style :border-top] "black 1px solid")
+                (assoc-in [:col-span] "2"))
+        total-time " ms"]]
       [:tr [:td {:col-span "4"} [enter-key "7vh"]]]]]))
-
 
 (defn progress[]
   (let [difficulty (:difficulty @app-state)
@@ -228,8 +247,7 @@
                  question {:op op :x x :y y}]]
        ^{:key (str/join " " [i j])}
        [:rect {:x i :y j :width "1" :height "1"
-               :fill (question-color question)
-               :on-click #(print (question-to-string question ""))}])]))
+               :fill (question-color question)}])]))
 
 (defn quiz-app []
   (let [{:keys [user-answer quiz]} @app-state
@@ -282,3 +300,4 @@
 
 
 
+;({:question {:op "+" :x 5, :y 7}, :time 1900, :user-answer 13} {:question {:op "+" :x 7, :y 6}, :time 7777, :user-answer 13} {:question {:op "*" :x 4, :y 8}, :time 3454, :user-answer 32} {:question {:op "*" :x 12, :y 5}, :time 2989, :user-answer 60} {:question {:op "+" :x 8, :y 6}, :time 2441, :user-answer 14} {:question {:op "/" :x 35, :y 5}, :time 2428, :user-answer 7} {:question {:op "+" :x 1, :y 5}, :time 2199, :user-answer 6} {:question {:op "-" :x 20, :y 8}, :time 2002, :user-answer 12} {:question {:op "*" :x 2, :y 3}, :time 1785, :user-answer 6} {:question {:op "/" :x 3, :y 3}, :time 1377, :user-answer 1})
