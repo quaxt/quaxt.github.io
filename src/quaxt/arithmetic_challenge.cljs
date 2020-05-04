@@ -4,12 +4,12 @@
    [reagent.core :as r]
    [clojure.edn :as edn]))
 
-(defonce app-state (r/atom {}))
-
-(def quiz-length 10)
+(defonce app-state (r/atom {:screen :settings
+                            :selected-setting 0
+                            :quiz-length 10
+                            :level 12}))
 
 (defn all-questions[]
-;;(print "all-questions")
   (shuffle (concat
             (for [op ["+" "*"]
                   x (range 1 13)
@@ -23,22 +23,19 @@
               {:op "/" :x (* x y) :y y}))))
 
 (defn sort-by-difficulty[questions]
-;;(print "sort-by-difficulty")
   (let [{:keys [difficulty]} @app-state]
     (sort (fn[a b] (compare (difficulty b 1000000) (difficulty a 1000000)))
           questions)))
 
 (defn make-quiz[n]
-;;(print "make-quiz")
   (shuffle (take n (sort-by-difficulty (all-questions)))))
 
 (defn now[]
-;;(print "now")
   (.now js/Date))
 
 (defn start-new-quiz[n]
-;;(print "start-new-quiz")
   (swap! app-state assoc
+         :screen :quiz
          :quiz (make-quiz n)
          :results []
          :user-answer ""
@@ -60,14 +57,11 @@
     (question-to-string (first quiz) user-answer)  "_"]])
 
 (defn type-key[text]
-;;(print "type-key")
   (swap! app-state update :user-answer str text))
 
 (defn key-div[text on-click]
-;;(print "key-div")
   [:div
-   {:style {:height "10vh"}}
-   
+   {:style {:height "10vh"}} 
    [:button
     {:style {:height "9vh"
              :font-size "8vh"
@@ -78,17 +72,14 @@
              :border-radius "4px"
              :cursor "pointer"
              :font-family "arial,sans-serif"
-             :text-align "center"                                  
-             }
+             :text-align "center"}
      :on-click on-click}
     text]])
 
 (defn keypad-key[text]
-;;(print "keypad-key")
   [key-div text #(type-key text)])
 
 (defn type-backspace[]
-;;(print "type-backspace")
   (swap! app-state
          update
          :user-answer
@@ -96,8 +87,11 @@
            (subs string 0 (- (count string) 1)))))
 
 (defn backspace-key[]
-;;(print "backspace-key")
   [key-div "\u232B" type-backspace])
+
+(defn type-escape[]
+  (swap! app-state
+         assoc :screen :settings))
 
 (defn as-int[x]
 ;;(print "as-int")
@@ -153,10 +147,9 @@
     (swap! app-state assoc :difficulty difficulty-table)))
 
 (defn type-enter[]
-;;(print "type-enter")
-  (let [{:keys [user-answer quiz results start-time]} @app-state]
-    (if (first quiz)
-      (when-not (= user-answer "")
+  (let [{:keys [user-answer quiz results start-time screen quiz-length]} @app-state]
+    (cond (= screen :settings) (start-new-quiz quiz-length)
+          (first quiz) (when-not (= user-answer "")
         (let [results (conj results 
                             {:question (first quiz)
                              :time (- (now) start-time)
@@ -168,13 +161,16 @@
                  :quiz (rest quiz)
                  :results results
                  :start-time (now))))
-      (do
+          :else (do
         (set-local-storage "difficulty" (:difficulty @app-state))
         (start-new-quiz quiz-length)))))
 
 (defn enter-key[font-size]
-;;(print "enter-key")
   [key-div "\u23CE" type-enter])
+
+(defn escape-key[font-size]
+  [key-div "\u238B" type-escape])
+
 
 (defn keypad[]
 ;;(print "keypad")
@@ -208,7 +204,7 @@
 
 (defn results-div[]
 ;;(print "results-div")
-  (let [results (:results @app-state)
+  (let [{:keys [results quiz-length]}  @app-state
         results (sort
                  (fn[x y] (compare 
                            [(not (right? (:question y) (:user-answer y))) (:time y)]
@@ -240,7 +236,16 @@
                 (assoc-in [:style :border-top] "black 1px solid")
                 (assoc-in [:col-span] "2"))
         total-time " ms"]]
-      [:tr [:td {:col-span "4"} [enter-key "7vh"]]]]]))
+      [:tr
+       [:td {:col-span "2"
+             :on-click type-enter
+             :style {:color "green" :height "7vh" :text-align "center"}} "\u23F5"]
+       [:td {:col-span "2"} [enter-key "7vh"]]]
+      [:tr
+       [:td {:col-span "2"
+             :on-click type-escape
+             :style {:height "7vh" :text-align "center"}} "\u2630"]
+       [:td {:col-span "2"} [escape-key "7vh"]]]]]))
 
 (def progress
   (memoize (fn[difficulty]
@@ -273,50 +278,98 @@
                   [:rect {:x i :y j :width "1" :height "1"
                           :fill (question-color question)}])]))))
 
+(defn quiz-length-icon[]
+  (let [right 300]
+    [:svg {:xmlns "http://www.w3.org/2000/svg", :xmlns-xlink "http://www.w3.org/1999/xlink", :width "100", :height "50", :view-box "0 0 420 210"}
+     [:symbol {:id "question"}
+      [:path {:d "M0,40 c 0 -48 64 -48 64 0 q 0 32 -24 32 v 24 h -16 v -40 q 24 0 24 -16 c 0 -24 -32 -24 -32 0 z ", :fill "currentcolor"}]
+      [:circle {:cx "32", :cy "120", :r "8", :fill "currentColor"}]]
+     [:use {:xlink-href "#question", :x 32, :y "64", :color "black"}]
+     [:use {:xlink-href "#question", :x right, :y "56", :color "#666", :stroke "black", :stroke-width "1"}]
+     [:use {:xlink-href "#question", :x (+ 8 right), :y "64", :color "#888", :stroke "black", :stroke-width "1"}]
+     [:use {:xlink-href "#question", :x (+ 16 right), :y "72", :color "#aaa", :stroke "black", :stroke-width "1"}]
+     [:path {:d "M170 160 h64 v-16 z"}]]))
+
+(defn level-icon[]
+  [:svg {:xmlns "http://www.w3.org/2000/svg", :xmlns-xlink "http://www.w3.org/1999/xlink", :width "100", :height "50", :view-box "0 0 420 210"}
+   [:path {:d "M0 48 h8 v-16 h8 v16 h98 v-16 h8 v16 h8 v8
+h-8 v16 h-8 v-16 h-98 v16 h-8 v-16 h-8"}]
+   [:path {:d "M170 64 h64 v-16 z"}]
+
+[:path {:d "M280 48 h8 v-16 h8 v16 h4 v-32 h 8 v 32 h 64 v-32 h 8 v32 h4 v-16 h8 v16 h8 v8
+
+h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]
+
+   
+   ])
+
+(defn settings-menu[]
+  (let [{:keys [level quiz-length selected-setting]} @app-state
+        settings-key (fn[selected-setting delta]
+                       (let [k ([:level :quiz-length] selected-setting)]
+                         [key-div ({1 "+"
+                                    -1 "-"} delta)
+                          (fn[](swap! app-state
+                                      (fn[app-state]
+                                        (-> app-state
+                                            (assoc :selected-setting selected-setting)
+                                            (update k  (partial + delta)))
+                                        )))]))]
+    [:table {:style {:border-collapse "collapse"}}
+     [:tbody
+      [:tr
+       (when (zero? selected-setting) {:style {
+                                              :border "1px solid black"
+                                              }})
+       [:td [level-icon]] [:td (settings-key 0 -1)] [:td level] [:td (settings-key 0 +1)]]
+      [:tr
+       (when (= 1 selected-setting) {:style {
+                                              :border "1px solid black"
+                                              }})
+       [:td [quiz-length-icon]] [:td (settings-key 1 -1)] [:td quiz-length] [:td (settings-key 1 +1)]]
+      [:tr
+       [:td {:on-click type-enter
+             :style {:color "green" :height "7vh" :text-align "center"}} "\u23F5"]
+       [:td {:col-span "3"}[enter-key "7vh"]]]]]))
+
 (defn quiz-app[]
-;;(print "quiz-app")
-  (let [{:keys [user-answer quiz difficulty]} @app-state
+  (let [{:keys [user-answer quiz difficulty screen]} @app-state
         question (first quiz)]
     [:div {:style {:width "100%"}}
-     [:div
-      (if question
-        [:div {:style {:touch-action "manipulation"}}
-         [ask quiz user-answer]
-         [keypad]]
-        [results-div])]
-     [progress difficulty]
-     ]))
+     (if (= :settings screen)
+       [:div [settings-menu]]
+       [:div
+        (if question
+          [:div {:style {:touch-action "manipulation"}}
+           [ask quiz user-answer]
+           [keypad]]
+          [results-div])])
+     [progress difficulty]]))
 
 (defn mount[el]
-;;(print "mount")
   (r/render-component [quiz-app] el))
 
 (defn get-app-element[]
-;;(print "get-app-element")
   (.getElementById js/document "app"))
 
 (defn mount-app-element[]
-;;(print "mount-app-element")
   (mount (get-app-element)))
 
 (defn key-listener[^js/KeyboardEvent key-event]
-;;(print "key-listener")
   (let [key (.-key key-event)]
     (cond
       (#{"0" "1" "2" "3" "4" "5" "6" "7" "8" "9"} key) (type-key key)
       (= key "Backspace") (type-backspace)
-      (= key "Enter") (type-enter))))
+      (= key "Enter") (type-enter)
+      (= key "Escape") (type-escape))))
 
 (defn add-key-listener[]
-;;(print "add-key-listener")
   (.addEventListener js/document "keydown" key-listener))
 
 (defn load-listener[x]
-;;(print "load-listener")
   (mount-app-element))
 
 (defn add-load-listerner[]
-;;(print "add-load-listerner")
   (.addEventListener js/window "load" load-listener))
 
 (defonce setup-stuff
@@ -324,12 +377,8 @@
     (read-difficulty-table-from-local-storage)
     (add-key-listener)
     (add-load-listerner)
-    (start-new-quiz quiz-length)
+    (start-new-quiz (:quiz-length @app-state))
     true))
 
 (defn ^:after-load on-reload []
   (mount-app-element))
-
-
-
-;({:question {:op "+" :x 5, :y 7}, :time 1900, :user-answer 13} {:question {:op "+" :x 7, :y 6}, :time 7777, :user-answer 13} {:question {:op "*" :x 4, :y 8}, :time 3454, :user-answer 32} {:question {:op "*" :x 12, :y 5}, :time 2989, :user-answer 60} {:question {:op "+" :x 8, :y 6}, :time 2441, :user-answer 14} {:question {:op "/" :x 35, :y 5}, :time 2428, :user-answer 7} {:question {:op "+" :x 1, :y 5}, :time 2199, :user-answer 6} {:question {:op "-" :x 20, :y 8}, :time 2002, :user-answer 12} {:question {:op "*" :x 2, :y 3}, :time 1785, :user-answer 6} {:question {:op "/" :x 3, :y 3}, :time 1377, :user-answer 1})
