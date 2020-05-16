@@ -9,34 +9,35 @@
                             :quiz-length 10
                             :level 12}))
 
-(defn all-questions[]
-  (shuffle (concat
-            (for [op ["+" "*"]
-                  x (range 1 13)
-                  y (range 1 13)]
-              {:op op :x x :y y})
-            (for [y (range 1 13)
-                  x (range y (+ y 13))]
-              {:op "-" :x x :y y})
-            (for [x (range 1 13)
-                  y (range 1 13)]
-              {:op "/" :x (* x y) :y y}))))
+(defn all-questions[level]
+  (let [max (inc level)]
+    (shuffle (concat
+              (for [op ["+" "*"]
+                    x (range 1 max)
+                    y (range 1 max)]
+                {:op op :x x :y y})
+              (for [y (range 1 max)
+                    x (range y (+ y max))]
+                {:op "-" :x x :y y})
+              (for [x (range 1 max)
+                    y (range 1 max)]
+                {:op "/" :x (* x y) :y y})))))
 
 (defn sort-by-difficulty[questions]
   (let [{:keys [difficulty]} @app-state]
     (sort (fn[a b] (compare (difficulty b 1000000) (difficulty a 1000000)))
           questions)))
 
-(defn make-quiz[n]
-  (shuffle (take n (sort-by-difficulty (all-questions)))))
+(defn make-quiz[n level]
+  (shuffle (take n (sort-by-difficulty (all-questions level)))))
 
 (defn now[]
   (.now js/Date))
 
-(defn start-new-quiz[n]
+(defn start-new-quiz[n level]
   (swap! app-state assoc
          :screen :quiz
-         :quiz (make-quiz n)
+         :quiz (make-quiz n level)
          :results []
          :user-answer ""
          :start-time (now)))
@@ -100,12 +101,10 @@
     x))
 
 (defn set-local-storage[key-name value]
-;;(print "set-local-storage")
   (-> (.-localStorage js/window)
       (.setItem key-name value)))
 
 (defn get-local-storage[key-name]
-;;(print "get-local-storage")
   (-> (.-localStorage js/window)
       (.getItem key-name)))
 
@@ -147,23 +146,32 @@
     (swap! app-state assoc :difficulty difficulty-table)))
 
 (defn type-enter[]
-  (let [{:keys [user-answer quiz results start-time screen quiz-length]} @app-state]
-    (cond (= screen :settings) (start-new-quiz quiz-length)
+  (let [{:keys [difficulty
+                level
+                quiz
+                quiz-length
+                results
+                screen
+                start-time
+                user-answer]} @app-state]
+    (cond (= screen :settings) (start-new-quiz quiz-length level)
           (first quiz) (when-not (= user-answer "")
-        (let [results (conj results 
-                            {:question (first quiz)
-                             :time (- (now) start-time)
-                             :user-answer (as-int user-answer)})]
-          (update-difficulty-table results)
-          (swap! app-state
-                 assoc
-                 :user-answer ""
-                 :quiz (rest quiz)
-                 :results results
-                 :start-time (now))))
+                         (let [results (conj results 
+                                             {:question (first quiz)
+                                              :time (- (now) start-time)
+                                              :user-answer (as-int user-answer)})]
+                           (update-difficulty-table results)
+                           (swap! app-state
+                                  assoc
+                                  :user-answer ""
+                                  :quiz (rest quiz)
+                                  :results results
+                                  :start-time (now))))
           :else (do
-        (set-local-storage "difficulty" (:difficulty @app-state))
-        (start-new-quiz quiz-length)))))
+                  (set-local-storage "difficulty" difficulty)
+                  (set-local-storage "quiz-length" quiz-length)
+                  (set-local-storage "level" level)
+                  (start-new-quiz quiz-length level)))))
 
 (defn enter-key[font-size]
   [key-div "\u23CE" type-enter])
@@ -373,11 +381,11 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]
   (.addEventListener js/window "load" load-listener))
 
 (defonce setup-stuff
-  (do
+  (let [{:keys [quiz-length level]} @app-state]
     (read-difficulty-table-from-local-storage)
     (add-key-listener)
     (add-load-listerner)
-    (start-new-quiz (:quiz-length @app-state))
+    (start-new-quiz quiz-length level)
     true))
 
 (defn ^:after-load on-reload []
