@@ -124,12 +124,19 @@
     time
     2000000))
 
-(defn read-difficulty-table-from-local-storage[]
-;;(print "read-difficulty-table-from-local-storage")
+(defn read-state-from-local-storage[]
   (let [difficulty-table-string (get-local-storage "difficulty")
         difficulty-table (if difficulty-table-string
                       (edn/read-string difficulty-table-string) {})]
-    (swap! app-state assoc :difficulty difficulty-table)))
+    (swap! app-state assoc :difficulty difficulty-table))
+  (let [quiz-length-string (get-local-storage "quiz-length")
+        quiz-length (if quiz-length-string
+                      (edn/read-string quiz-length-string) 10)]
+    (swap! app-state assoc :quiz-length quiz-length))
+  (let [level-string (get-local-storage "level")
+        level (if level-string
+                      (edn/read-string level-string) 12)]
+    (swap! app-state assoc :level level)))
 
 (defn compute-difficulty-table[results]
 ;;(print "compute-difficulty-table")
@@ -256,7 +263,7 @@
        [:td {:col-span "2"} [escape-key "7vh"]]]]]))
 
 (def progress
-  (memoize (fn[difficulty]
+  (memoize (fn[difficulty level]
              (let [question-color (fn[question]
                                     (let [d (difficulty question 1000000)]
                                       (case d
@@ -266,16 +273,16 @@
                                           (str "rgb(" level ","
                                                level ","
                                                level ")")))))]
-               [:svg {:view-box "0 0 48 12"
+               [:svg {:view-box (str "0 0 " (* 4 level) " " level)
                       :width "100%"
                       :height "120"
                       :preserve-aspect-ratio "none"
                       :xmlns "http://www.w3.org/2000/svg"}
-                (for [i (range 0 48)
-                      j (range 0 12)
-                      :let [op-index (quot i 12)
+                (for [i (range 0 (* 4 level))
+                      j (range 0 level)
+                      :let [op-index (quot i level)
                             op (["+" "*" "-" "/"] op-index)
-                            [x y] [(inc (mod i 12)) (inc j)]
+                            [x y] [(inc (mod i level)) (inc j)]
                             [x y] (case op
                                     "+" [x y]
                                     "*" [x y]
@@ -341,7 +348,7 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]
        [:td {:col-span "3"}[enter-key "7vh"]]]]]))
 
 (defn quiz-app[]
-  (let [{:keys [user-answer quiz difficulty screen]} @app-state
+  (let [{:keys [user-answer quiz difficulty screen level]} @app-state
         question (first quiz)]
     [:div {:style {:width "100%"}}
      (if (= :settings screen)
@@ -352,7 +359,7 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]
            [ask quiz user-answer]
            [keypad]]
           [results-div])])
-     [progress difficulty]]))
+     [progress difficulty level]]))
 
 (defn mount[el]
   (r/render-component [quiz-app] el))
@@ -382,7 +389,7 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]
 
 (defonce setup-stuff
   (let [{:keys [quiz-length level]} @app-state]
-    (read-difficulty-table-from-local-storage)
+    (read-state-from-local-storage)
     (add-key-listener)
     (add-load-listerner)
     (start-new-quiz quiz-length level)
