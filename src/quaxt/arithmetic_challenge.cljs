@@ -306,17 +306,28 @@
      [:path {:d "M170 160 h64 v-16 z"}]]))
 
 (defn level-icon[]
-  [:svg {:xmlns "http://www.w3.org/2000/svg", :xmlns-xlink "http://www.w3.org/1999/xlink", :width "100", :height "50", :view-box "0 0 420 210"}
+  [:svg {:xmlns "http://www.w3.org/2000/svg", :xmlns-xlink "http://www.w3.org/1999/xlink", :width "100", :height "50", :view-box "0 0 420 110"}
    [:path {:d "M0 48 h8 v-16 h8 v16 h98 v-16 h8 v16 h8 v8
 h-8 v16 h-8 v-16 h-98 v16 h-8 v-16 h-8"}]
    [:path {:d "M170 64 h64 v-16 z"}]
 
 [:path {:d "M280 48 h8 v-16 h8 v16 h4 v-32 h 8 v 32 h 64 v-32 h 8 v32 h4 v-16 h8 v16 h8 v8
 
-h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]
+h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
 
-   
-   ])
+(defn play-icon[]
+  [:svg {:xmlns "http://www.w3.org/2000/svg", :xmlns-xlink "http://www.w3.org/1999/xlink", :width "57", :height "23", :view-box "0 0 96 128"}
+   [:path {:fill "green"
+           :d "M0 0 l96 64 l-96 64 z"}]])
+
+(defn adjust-settings!
+  [selected-setting delta]
+  (let [k ([:level :quiz-length] selected-setting)]
+    (swap! app-state
+           (fn[app-state]
+             (-> app-state
+                 (assoc :selected-setting selected-setting)
+                 (update k  (partial + delta)))))))
 
 (defn settings-menu[]
   (let [{:keys [level quiz-length selected-setting]} @app-state
@@ -324,18 +335,11 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]
                        (let [k ([:level :quiz-length] selected-setting)]
                          [key-div ({1 "+"
                                     -1 "-"} delta)
-                          (fn[](swap! app-state
-                                      (fn[app-state]
-                                        (-> app-state
-                                            (assoc :selected-setting selected-setting)
-                                            (update k  (partial + delta)))
-                                        )))]))]
+                          (fn[](adjust-settings! selected-setting delta))]))]
     [:table {:style {:border-collapse "collapse"}}
      [:tbody
       [:tr
-       (when (zero? selected-setting) {:style {
-                                              :border "1px solid black"
-                                              }})
+       (when (zero? selected-setting) {:style {:border "1px solid black"}})
        [:td [level-icon]] [:td (settings-key 0 -1)] [:td level] [:td (settings-key 0 +1)]]
       [:tr
        (when (= 1 selected-setting) {:style {
@@ -344,16 +348,18 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]
        [:td [quiz-length-icon]] [:td (settings-key 1 -1)] [:td quiz-length] [:td (settings-key 1 +1)]]
       [:tr
        [:td {:on-click type-enter
-             :style {:color "green" :height "7vh" :text-align "center"}} "\u23F5"]
+             :style {:color "green" :height "7vh" :text-align "center"}} [play-icon]]
        [:td {:col-span "3"}[enter-key "7vh"]]]]]))
 
 (defn quiz-app[]
   (let [{:keys [user-answer quiz difficulty screen level]} @app-state
         question (first quiz)]
-    [:div {:style {:width "100%"}}
+    [:div 
      (if (= :settings screen)
-       [:div [settings-menu]]
-       [:div
+       [:div {:style {:margin "auto"
+                   :width "fit-content"}} [settings-menu]]
+       [:div {:style {:margin "auto"
+                   :width "fit-content"}}
         (if question
           [:div {:style {:touch-action "manipulation"}}
            [ask quiz user-answer]
@@ -376,7 +382,14 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]
       (#{"0" "1" "2" "3" "4" "5" "6" "7" "8" "9"} key) (type-key key)
       (= key "Backspace") (type-backspace)
       (= key "Enter") (type-enter)
-      (= key "Escape") (type-escape))))
+      (= key "Escape") (type-escape)
+      (#{"ArrowUp" "ArrowDown"} key) (swap! app-state
+                                            update
+                                            :selected-setting
+                                            (fn[selected-setting]
+                                              (- 1 selected-setting)))
+      (#{"ArrowLeft" "-"}  key) (adjust-settings!  (:selected-setting @app-state) -1)
+      (#{"ArrowRight" "+"}  key) (adjust-settings! (:selected-setting @app-state) 1))))
 
 (defn add-key-listener[]
   (.addEventListener js/document "keydown" key-listener))
