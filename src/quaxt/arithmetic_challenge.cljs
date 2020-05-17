@@ -217,6 +217,11 @@
            time]))
        (apply map +)))
 
+(defn play-icon[]
+  [:svg {:xmlns "http://www.w3.org/2000/svg", :xmlns-xlink "http://www.w3.org/1999/xlink", :width "57", :height "23", :view-box "0 0 96 128"}
+   [:path {:fill "green"
+           :d "M0 0 l96 64 l-96 64 z"}]])
+
 (defn results-div[]
 ;;(print "results-div")
   (let [{:keys [results quiz-length]}  @app-state
@@ -254,7 +259,7 @@
       [:tr
        [:td {:col-span "2"
              :on-click type-enter
-             :style {:color "green" :height "7vh" :text-align "center"}} "\u23F5"]
+             :style {:color "green" :height "7vh" :text-align "center"}} [play-icon]]
        [:td {:col-span "2"} [enter-key "7vh"]]]
       [:tr
        [:td {:col-span "2"
@@ -314,11 +319,6 @@ h-8 v16 h-8 v-16 h-98 v16 h-8 v-16 h-8"}]
 [:path {:d "M280 48 h8 v-16 h8 v16 h4 v-32 h 8 v 32 h 64 v-32 h 8 v32 h4 v-16 h8 v16 h8 v8
 
 h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
-
-(defn play-icon[]
-  [:svg {:xmlns "http://www.w3.org/2000/svg", :xmlns-xlink "http://www.w3.org/1999/xlink", :width "57", :height "23", :view-box "0 0 96 128"}
-   [:path {:fill "green"
-           :d "M0 0 l96 64 l-96 64 z"}]])
 
 (defn adjust-settings!
   [selected-setting delta]
