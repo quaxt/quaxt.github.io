@@ -43,7 +43,6 @@
          :start-time (now)))
 
 (defn question-to-string[{:keys [op x y]} user-answer]
-;;(print "question-to-string")
   (let [op ({"*" "\u00D7"
              "/" "\u00F7"
              "+" "+"
@@ -51,7 +50,6 @@
     (str x " " op " " y " = " user-answer)))
 
 (defn ask[quiz user-answer]
-;;(print "ask")
   [:div
    [:div
     {:style {:font-size "13vw"}}
@@ -95,7 +93,6 @@
          assoc :screen :settings))
 
 (defn as-int[x]
-;;(print "as-int")
   (if (string? x)
     (js/parseInt x)
     x))
@@ -115,11 +112,9 @@
    "/" /})
 
 (defn right?[{:keys [op x y]} user-answer]
-;;(print "right?")
   (= ((lookup-op op) x y) user-answer))
 
 (defn difficulty[{:keys [question time user-answer]}]
-;;(print "difficulty")
   (if (right? question user-answer)
     time
     2000000))
@@ -139,7 +134,6 @@
     (swap! app-state assoc :level level)))
 
 (defn compute-difficulty-table[results]
-;;(print "compute-difficulty-table")
   (let [old-results (:difficulty @app-state)
         result-map (into {} (map (fn[result]
                                    (difficulty result)
@@ -148,7 +142,6 @@
     (merge old-results result-map)))
 
 (defn update-difficulty-table[results]
-;;(print "update-difficulty-table")
   (let [difficulty-table (compute-difficulty-table results)]
     (swap! app-state assoc :difficulty difficulty-table)))
 
@@ -188,7 +181,6 @@
 
 
 (defn keypad[]
-;;(print "keypad")
   [:table
    {:style {:width "100%" :table-layout " fixed"}}
    [:tbody
@@ -200,7 +192,6 @@
      [:td [enter-key]]]]])
 
 (defn right-or-wrong-td[style question user-answer]
-;;(print "right-or-wrong-td")
   (let [right (right? question user-answer)]
     (let [s (assoc-in style [:style :color] (if right "#00aa00" "ff0000"))]
       [:td s
@@ -209,7 +200,6 @@
 (defn results-total
   "take results and return number of right answers and total time"
   [results]
-  ;;(print "results-total")
   (->> results
        (map
         (fn[{:keys [question user-answer time]}]
@@ -223,7 +213,6 @@
            :d "M0 0 l96 64 l-96 64 z"}]])
 
 (defn results-div[]
-;;(print "results-div")
   (let [{:keys [results quiz-length]}  @app-state
         results (sort
                  (fn[x y] (compare 
@@ -401,12 +390,13 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
   (.addEventListener js/window "load" load-listener))
 
 (defonce setup-stuff
-  (let [{:keys [quiz-length level]} @app-state]
+  (do
     (read-state-from-local-storage)
-    (add-key-listener)
-    (add-load-listerner)
-    (start-new-quiz quiz-length level)
-    true))
+    (let [{:keys [quiz-length level]} @app-state]
+      (add-key-listener)
+      (add-load-listerner)
+      (start-new-quiz quiz-length level))
+         true))
 
 (defn ^:after-load on-reload []
   (mount-app-element))
