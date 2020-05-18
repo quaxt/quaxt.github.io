@@ -4,11 +4,13 @@
    [reagent.core :as r]
    [clojure.edn :as edn]))
 
-(defonce app-state (r/atom {:screen :settings
-                            :selected-setting 0
-                            :quiz-length 10
-                            :level 12
-                            :question-types #{"+" "-" "*" "/"}}))
+(def defaults {:screen :settings
+               :selected-setting 0
+               :quiz-length 10
+               :level 12
+               :question-types #{"+" "-" "*" "/"}})
+
+(defonce app-state (r/atom defaults))
 
 (defn all-questions[level question-types]
   (let [max (inc level)]
@@ -125,18 +127,16 @@
     2000000))
 
 (defn read-state-from-local-storage[]
-  (let [difficulty-table-string (get-local-storage "difficulty")
-        difficulty-table (if difficulty-table-string
-                      (edn/read-string difficulty-table-string) {})]
-    (swap! app-state assoc :difficulty difficulty-table))
-  (let [quiz-length-string (get-local-storage "quiz-length")
-        quiz-length (if quiz-length-string
-                      (edn/read-string quiz-length-string) 10)]
-    (swap! app-state assoc :quiz-length quiz-length))
-  (let [level-string (get-local-storage "level")
-        level (if level-string
-                      (edn/read-string level-string) 12)]
-    (swap! app-state assoc :level level)))
+  (doseq [setting [:difficulty :quiz-length :level :question-types]]
+    (let [setting-string (get-local-storage (name setting))
+          setting-value (if setting-string
+                          (edn/read-string setting-string) (setting defaults))]
+      (swap! app-state assoc setting setting-value)))
+  (print (:question-types @app-state)))
+
+(defn write-state-to-local-storage[]
+  (doseq [setting [:difficulty :quiz-length :level :question-types]]
+    (set-local-storage (name setting) (setting @app-state))))
 
 (defn compute-difficulty-table[results]
   (let [old-results (:difficulty @app-state)
@@ -174,9 +174,7 @@
                                   :results results
                                   :start-time (now))))
           :else (do
-                  (set-local-storage "difficulty" difficulty)
-                  (set-local-storage "quiz-length" quiz-length)
-                  (set-local-storage "level" level)
+                  (write-state-to-local-storage)
                   (start-new-quiz quiz-length level question-types)))))
 
 (defn enter-key[font-size]
@@ -281,7 +279,7 @@
                 (for [i (range 0 (* (count question-types) level))
                       j (range 0 level)
                       :let [op-index (quot i level)
-                            op (["+" "*" "-" "/"] op-index)
+                            op (nth (filter question-types ["+" "*" "-" "/"]) op-index)
                             [x y] [(inc (mod i level)) (inc j)]
                             [x y] (case op
                                     "+" [x y]
@@ -321,7 +319,6 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
   (let [f (if (contains? s k)
             disj
             conj)]
-    (print f)
     (f s k)))
 
 (defn toggle-question-type[op]
@@ -338,22 +335,30 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
       (swap! app-state
              (fn[app-state]
                (-> app-state
-                   (assoc :selected-setting selected-setting)
-                   (update k  (partial + delta))))))))
+                   (update k  (partial + delta)))))))
+  (swap! app-state
+             (fn[app-state]
+               (-> app-state
+                   (assoc :selected-setting selected-setting)))))
 
 
 
-(defn question-type-toggle-control[op selected]
+(defn question-type-toggle-control[op setting-number selected-setting]
   (let [{:keys [question-types]} @app-state]
     [:tr
-     (when selected {:style {:border "1px solid black"}})
+     (when (= setting-number selected-setting)
+       {:style {:border "1px solid black"}})
      [:td {:style {:text-align "center"}} (op-to-string op)]
      [:td {:col-span "3"
            :style {:text-align "center"}}
       [:input
        {:type "checkbox"
         :checked (boolean (question-types op))
-        :on-change #(toggle-question-type op)}]]]))
+        :on-change #((toggle-question-type op)
+                     (swap! app-state
+                            (fn[app-state]
+                              (-> app-state
+                                  (assoc :selected-setting setting-number)))))}]]]))
 
 (defn settings-menu[]
   (let [{:keys [level quiz-length selected-setting]} @app-state
@@ -370,10 +375,10 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
       [:tr
        (when (= 1 selected-setting) {:style {:border "1px solid black"}})
        [:td [quiz-length-icon]] [:td (settings-key 1 -1)] [:td quiz-length] [:td (settings-key 1 +1)]]
-      [question-type-toggle-control "+" (= 2 selected-setting)]
-      [question-type-toggle-control "*" (= 3 selected-setting)]
-      [question-type-toggle-control "-" (= 4 selected-setting)]
-      [question-type-toggle-control "/" (= 5 selected-setting)]
+      [question-type-toggle-control "+" 2 selected-setting]
+      [question-type-toggle-control "*" 3 selected-setting]
+      [question-type-toggle-control "-" 4 selected-setting]
+      [question-type-toggle-control "/" 5 selected-setting]
       [:tr
        [:td {:on-click type-enter
              :style {:color "green" :height "7vh" :text-align "center"}} [play-icon]]
@@ -435,6 +440,7 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
   (do
     (read-state-from-local-storage)
     (let [{:keys [quiz-length level question-types]} @app-state]
+      (print question-types)
       (add-key-listener)
       (add-load-listerner)
       (start-new-quiz quiz-length level question-types))
