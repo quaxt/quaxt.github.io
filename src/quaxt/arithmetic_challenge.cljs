@@ -7,47 +7,52 @@
 (defonce app-state (r/atom {:screen :settings
                             :selected-setting 0
                             :quiz-length 10
-                            :level 12}))
+                            :level 12
+                            :question-types #{"+" "-" "*" "/"}}))
 
-(defn all-questions[level]
+(defn all-questions[level question-types]
   (let [max (inc level)]
     (shuffle (concat
-              (for [op ["+" "*"]
+              (for [op (disj question-types "-" "/")
                     x (range 1 max)
                     y (range 1 max)]
                 {:op op :x x :y y})
-              (for [y (range 1 max)
-                    x (range y (+ y max))]
-                {:op "-" :x x :y y})
-              (for [x (range 1 max)
-                    y (range 1 max)]
-                {:op "/" :x (* x y) :y y})))))
+              (when (question-types "-")
+                (for [y (range 1 max)
+                      x (range y (+ y max))]
+                  {:op "-" :x x :y y}))
+              (when (question-types "/")
+                (for [x (range 1 max)
+                      y (range 1 max)]
+                  {:op "/" :x (* x y) :y y}))))))
 
 (defn sort-by-difficulty[questions]
   (let [{:keys [difficulty]} @app-state]
     (sort (fn[a b] (compare (difficulty b 1000000) (difficulty a 1000000)))
           questions)))
 
-(defn make-quiz[n level]
-  (shuffle (take n (sort-by-difficulty (all-questions level)))))
+(defn make-quiz[n level question-types]
+  (shuffle (take n (sort-by-difficulty (all-questions level question-types)))))
 
 (defn now[]
   (.now js/Date))
 
-(defn start-new-quiz[n level]
+(defn start-new-quiz[n level question-types]
   (swap! app-state assoc
          :screen :quiz
-         :quiz (make-quiz n level)
+         :quiz (make-quiz n level question-types)
          :results []
          :user-answer ""
          :start-time (now)))
 
+(def op-to-string
+  {"*" "\u00D7"
+   "/" "\u00F7"
+   "+" "+"
+   "-" "\u2212"})
+
 (defn question-to-string[{:keys [op x y]} user-answer]
-  (let [op ({"*" "\u00D7"
-             "/" "\u00F7"
-             "+" "+"
-             "-" "\u2212"} op)]
-    (str x " " op " " y " = " user-answer)))
+  (str x " " (op-to-string op) " " y " = " user-answer))
 
 (defn ask[quiz user-answer]
   [:div
@@ -153,8 +158,9 @@
                 results
                 screen
                 start-time
-                user-answer]} @app-state]
-    (cond (= screen :settings) (start-new-quiz quiz-length level)
+                user-answer
+                question-types]} @app-state]
+    (cond (= screen :settings) (start-new-quiz quiz-length level question-types)
           (first quiz) (when-not (= user-answer "")
                          (let [results (conj results 
                                              {:question (first quiz)
@@ -171,7 +177,7 @@
                   (set-local-storage "difficulty" difficulty)
                   (set-local-storage "quiz-length" quiz-length)
                   (set-local-storage "level" level)
-                  (start-new-quiz quiz-length level)))))
+                  (start-new-quiz quiz-length level question-types)))))
 
 (defn enter-key[font-size]
   [key-div "\u23CE" type-enter])
@@ -257,7 +263,7 @@
        [:td {:col-span "2"} [escape-key "7vh"]]]]]))
 
 (def progress
-  (memoize (fn[difficulty level]
+  (memoize (fn[difficulty level question-types]
              (let [question-color (fn[question]
                                     (let [d (difficulty question 1000000)]
                                       (case d
@@ -267,12 +273,12 @@
                                           (str "rgb(" level ","
                                                level ","
                                                level ")")))))]
-               [:svg {:view-box (str "0 0 " (* 4 level) " " level)
+               [:svg {:view-box (str "0 0 " (* (count question-types) level) " " level)
                       :width "100%"
                       :height "120"
                       :preserve-aspect-ratio "none"
                       :xmlns "http://www.w3.org/2000/svg"}
-                (for [i (range 0 (* 4 level))
+                (for [i (range 0 (* (count question-types) level))
                       j (range 0 level)
                       :let [op-index (quot i level)
                             op (["+" "*" "-" "/"] op-index)
@@ -309,14 +315,45 @@ h-8 v16 h-8 v-16 h-98 v16 h-8 v-16 h-8"}]
 
 h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
 
+(defn toggle
+  "if s contains k remove it, otherwise add it"
+  [s k]
+  (let [f (if (contains? s k)
+            disj
+            conj)]
+    (print f)
+    (f s k)))
+
+(defn toggle-question-type[op]
+  (swap! app-state
+         update
+         :question-types
+         (fn[question-types] (toggle question-types op))))
+
 (defn adjust-settings!
   [selected-setting delta]
-  (let [k ([:level :quiz-length] selected-setting)]
-    (swap! app-state
-           (fn[app-state]
-             (-> app-state
-                 (assoc :selected-setting selected-setting)
-                 (update k  (partial + delta)))))))
+  (if (> selected-setting 1)
+    (toggle-question-type (["+" "*" "-" "/"] (- selected-setting 2)))
+    (let [k ([:level :quiz-length] selected-setting)]
+      (swap! app-state
+             (fn[app-state]
+               (-> app-state
+                   (assoc :selected-setting selected-setting)
+                   (update k  (partial + delta))))))))
+
+
+
+(defn question-type-toggle-control[op selected]
+  (let [{:keys [question-types]} @app-state]
+    [:tr
+     (when selected {:style {:border "1px solid black"}})
+     [:td {:style {:text-align "center"}} (op-to-string op)]
+     [:td {:col-span "3"
+           :style {:text-align "center"}}
+      [:input
+       {:type "checkbox"
+        :checked (boolean (question-types op))
+        :on-change #(toggle-question-type op)}]]]))
 
 (defn settings-menu[]
   (let [{:keys [level quiz-length selected-setting]} @app-state
@@ -331,17 +368,19 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
        (when (zero? selected-setting) {:style {:border "1px solid black"}})
        [:td [level-icon]] [:td (settings-key 0 -1)] [:td level] [:td (settings-key 0 +1)]]
       [:tr
-       (when (= 1 selected-setting) {:style {
-                                              :border "1px solid black"
-                                              }})
+       (when (= 1 selected-setting) {:style {:border "1px solid black"}})
        [:td [quiz-length-icon]] [:td (settings-key 1 -1)] [:td quiz-length] [:td (settings-key 1 +1)]]
+      [question-type-toggle-control "+" (= 2 selected-setting)]
+      [question-type-toggle-control "*" (= 3 selected-setting)]
+      [question-type-toggle-control "-" (= 4 selected-setting)]
+      [question-type-toggle-control "/" (= 5 selected-setting)]
       [:tr
        [:td {:on-click type-enter
              :style {:color "green" :height "7vh" :text-align "center"}} [play-icon]]
        [:td {:col-span "3"}[enter-key "7vh"]]]]]))
 
 (defn quiz-app[]
-  (let [{:keys [user-answer quiz difficulty screen level]} @app-state
+  (let [{:keys [user-answer quiz difficulty screen level question-types]} @app-state
         question (first quiz)]
     [:div 
      (if (= :settings screen)
@@ -354,7 +393,7 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
            [ask quiz user-answer]
            [keypad]]
           [results-div])])
-     [progress difficulty level]]))
+     [progress difficulty level question-types]]))
 
 (defn mount[el]
   (r/render-component [quiz-app] el))
@@ -366,17 +405,20 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
   (mount (get-app-element)))
 
 (defn key-listener[^js/KeyboardEvent key-event]
-  (let [key (.-key key-event)]
+  (let [key (.-key key-event)
+        change-setting-selection (fn[delta]
+                                   (swap! app-state
+                                            update
+                                            :selected-setting
+                                            (fn[selected-setting]
+                                              (mod (+ delta selected-setting) 6))))]
     (cond
       (#{"0" "1" "2" "3" "4" "5" "6" "7" "8" "9"} key) (type-key key)
       (= key "Backspace") (type-backspace)
       (= key "Enter") (type-enter)
       (= key "Escape") (type-escape)
-      (#{"ArrowUp" "ArrowDown"} key) (swap! app-state
-                                            update
-                                            :selected-setting
-                                            (fn[selected-setting]
-                                              (- 1 selected-setting)))
+      (= key "ArrowUp") (change-setting-selection -1)
+      (= key "ArrowDown") (change-setting-selection 1)
       (#{"ArrowLeft" "-"}  key) (adjust-settings!  (:selected-setting @app-state) -1)
       (#{"ArrowRight" "+"}  key) (adjust-settings! (:selected-setting @app-state) 1))))
 
@@ -392,10 +434,10 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
 (defonce setup-stuff
   (do
     (read-state-from-local-storage)
-    (let [{:keys [quiz-length level]} @app-state]
+    (let [{:keys [quiz-length level question-types]} @app-state]
       (add-key-listener)
       (add-load-listerner)
-      (start-new-quiz quiz-length level))
+      (start-new-quiz quiz-length level question-types))
          true))
 
 (defn ^:after-load on-reload []
