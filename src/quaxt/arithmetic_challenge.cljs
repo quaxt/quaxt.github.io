@@ -127,12 +127,11 @@
     2000000))
 
 (defn read-state-from-local-storage[]
-  (doseq [setting [:difficulty :quiz-length :level :question-types]]
+  (doseq [setting [:difficulty :quiz-length :level :question-types]]+	
     (let [setting-string (get-local-storage (name setting))
           setting-value (if setting-string
                           (edn/read-string setting-string) (setting defaults))]
-      (swap! app-state assoc setting setting-value)))
-  (print (:question-types @app-state)))
+      (swap! app-state assoc setting setting-value))))
 
 (defn write-state-to-local-storage[]
   (doseq [setting [:difficulty :quiz-length :level :question-types]]
@@ -410,22 +409,26 @@ h-8 v16 h-8 v-16 h-4 v32 h-8 v-32 h-64 v32 h-8 v-32 h-4 v16 h-8 v-16 h-8 z"}]])
   (mount (get-app-element)))
 
 (defn key-listener[^js/KeyboardEvent key-event]
-  (let [key (.-key key-event)
+  (let [{:keys [screen]} @app-state
+        settings-screen? (= :settings screen)
+        key (.-key key-event)
         change-setting-selection (fn[delta]
                                    (swap! app-state
                                             update
                                             :selected-setting
                                             (fn[selected-setting]
                                               (mod (+ delta selected-setting) 6))))]
+    (print "ok1")
+    (print  screen)
     (cond
       (#{"0" "1" "2" "3" "4" "5" "6" "7" "8" "9"} key) (type-key key)
       (= key "Backspace") (type-backspace)
       (= key "Enter") (type-enter)
       (= key "Escape") (type-escape)
-      (= key "ArrowUp") (change-setting-selection -1)
-      (= key "ArrowDown") (change-setting-selection 1)
-      (#{"ArrowLeft" "-"}  key) (adjust-settings!  (:selected-setting @app-state) -1)
-      (#{"ArrowRight" "+"}  key) (adjust-settings! (:selected-setting @app-state) 1))))
+      (and (= key "ArrowUp") settings-screen?) (change-setting-selection -1)
+      (and (= key "ArrowDown") settings-screen?) (change-setting-selection 1)
+      (and (#{"ArrowLeft" "-"}  key) settings-screen?) (adjust-settings!  (:selected-setting @app-state) -1)
+      (and (#{"ArrowRight" "+"}  key) settings-screen?) (adjust-settings! (:selected-setting @app-state) 1))))
 
 (defn add-key-listener[]
   (.addEventListener js/document "keydown" key-listener))
